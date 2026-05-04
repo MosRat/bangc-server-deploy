@@ -1,0 +1,305 @@
+openapi: 3.0.3
+info:
+  title: BangC MCP Server Web API
+  description: HTTP API for the BangC MCP Server providing document retrieval and MCP integration.
+  version: "1.0.0"
+servers:
+  - url: http://127.0.0.1:8765
+    description: Default local server
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  name:
+                    type: string
+                  version:
+                    type: string
+
+  /v1/sources:
+    get:
+      summary: Get document sources statistics
+      responses:
+        '200':
+          description: Statistics of indexed documents
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v1/tools:
+    get:
+      summary: Get available MCP tools
+      responses:
+        '200':
+          description: List of available tools and their schemas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tools:
+                    type: array
+                    items:
+                      type: object
+
+  /v1/documents:
+    get:
+      summary: List documents
+      description: List embedded documents, optionally filtered by source.
+      parameters:
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [api_reference, programming_guide, tutorial, best_practice, other]
+          description: Filter by document source
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 80
+          description: Maximum number of documents to return
+      responses:
+        '200':
+          description: List of documents
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v1/search:
+    post:
+      summary: Full-text search
+      description: Search embedded BangC docs, API references, best practices, and tutorial code. Uses BM25-style scoring plus symbol/title/source boosts.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                source:
+                  type: string
+                  enum: [api_reference, programming_guide, tutorial, best_practice, other]
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 40
+              required: [query]
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v1/api_lookup:
+    post:
+      summary: Lookup API symbol
+      description: Look up a BangC/CNRT API symbol, preferring official API reference and practical notes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                symbol:
+                  type: string
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 40
+              required: [symbol]
+      responses:
+        '200':
+          description: API Reference results
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v1/symbols:
+    post:
+      summary: Query symbol index and related documents
+      description: Find BangC/CNRT symbols and documents that mention them.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 80
+              required: [query]
+      responses:
+        '200':
+          description: Symbol information
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v1/chunk:
+    post:
+      summary: Get full text chunk
+      description: Read the full indexed chunk returned by bangc_search.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+              required: [id]
+      responses:
+        '200':
+          description: Chunk text
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v1/doc:
+    post:
+      summary: Get full document content
+      description: Read a complete embedded document by id or path.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id_or_path:
+                  type: string
+              required: [id_or_path]
+      responses:
+        '200':
+          description: Full document content
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v1/tutorials:
+    post:
+      summary: List or retrieve tutorials and examples
+      description: List or search embedded BangC tutorials and sample implementations.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 40
+      responses:
+        '200':
+          description: Tutorial details
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v1/context_pack:
+    post:
+      summary: Get multi-chunk context pack
+      description: Return a compact multi-snippet context pack for agent prompting.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 20
+                max_chars:
+                  type: integer
+                  minimum: 500
+                  maximum: 20000
+              required: [query]
+      responses:
+        '200':
+          description: Context pack with total size limits applied
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /v1/tools/call:
+    post:
+      summary: Call an MCP tool by name
+      description: Uniform JSON-RPC-like invocation of actual underlying MCP tool implementations without relying on MCP transport.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: "Tool name to call (e.g. 'bangc_search')"
+                arguments:
+                  type: object
+                  description: "Arguments matching the tool's inputSchema"
+              required: [name]
+      responses:
+        '200':
+          description: Tool call result
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Bad request or tool execution error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Tool or resource not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
